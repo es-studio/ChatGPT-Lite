@@ -3,6 +3,11 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isAllowedChatGptUrl } from '../src/lib/domainPolicy';
+import {
+  checkForUpdate,
+  GITHUB_RELEASES_PAGE,
+  type UpdateInfo
+} from './updateCheck';
 
 const CHATGPT_URL = 'https://chatgpt.com/';
 const WINDOW_STATE_FILE = 'window-state.json';
@@ -19,6 +24,18 @@ type WindowState = {
 };
 
 let mainWindow: BrowserWindow | null = null;
+let updateInfo: UpdateInfo | null = null;
+
+function getAppVersion(): string {
+  try {
+    const pkgPath = path.join(__dirname, '../package.json');
+    if (!existsSync(pkgPath)) return '0.0.0';
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+    return pkg?.version ?? '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
 
 // Keep ChatGPT login/session usable inside webview by disabling Chromium's
 // third-party cookie phaseout behavior in this app.
@@ -193,29 +210,36 @@ function handleCommandShortcut(input: Electron.Input, targetWindow: BrowserWindo
   return false;
 }
 
-function configureApplicationMenu(): void {
+function configureApplicationMenu(info: UpdateInfo | null = null): void {
   if (process.platform !== 'darwin') {
     return;
   }
 
+  const appSubmenu: Electron.MenuItemConstructorOptions[] = [
+    { role: 'about' },
+    ...(info?.hasUpdate
+      ? [
+          { type: 'separator' as const },
+          {
+            label: `업데이트 확인 (v${info.latestVersion} 사용 가능)`,
+            click: () => openExternalIfSafe(info.releaseUrl)
+          }
+        ]
+      : []),
+    { type: 'separator' },
+    { role: 'services' },
+    { type: 'separator' },
+    { role: 'hide' },
+    { role: 'hideOthers' },
+    { role: 'unhide' },
+    { type: 'separator' },
+    { role: 'quit' }
+  ];
+
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: app.name,
-      submenu: [{ role: 'about' }, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'pasteAndMatchStyle' },
-        { role: 'delete' },
-        { role: 'selectAll' }
-      ]
+      submenu: appSubmenu
     },
     {
       label: 'File',
@@ -232,6 +256,20 @@ function configureApplicationMenu(): void {
         },
         { type: 'separator' },
         { role: 'close' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' }
       ]
     }
   ];
@@ -333,8 +371,16 @@ function createMainWindow(sourceWindow?: BrowserWindow | null): BrowserWindow {
   return window;
 }
 
-app.whenReady().then(() => {
-  configureApplicationMenu();
+app.whenReady().then(async () => {
+  configureApplicationMenu(updateInfo);
+
+  // 하루에 한 번 GitHub Releases 확인
+  const currentVersion = getAppVersion();
+  const userDataPath = app.getPath('userData');
+  checkForUpdate(currentVersion, userDataPath).then((info) => {
+    updateInfo = info;
+    configureApplicationMenu(updateInfo);
+  });
 
   const persistedSession = session.fromPartition('persist:chatgptlite');
   persistedSession.setPermissionRequestHandler((_webContents, permission, callback) => {
