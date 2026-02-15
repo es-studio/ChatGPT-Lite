@@ -1,0 +1,54 @@
+{
+  "name": "ChatGPT-Lite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A lightweight ChatGPT-only desktop app built with Electron + Svelte",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "dist:mac": "pnpm build && pnpm exec electron-builder --mac dmg zip",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "build": {
+    "appId": "com.esstudio.chatgptlite.app",
+    "productName": "ChatGPT-Lite",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "build/icons/ChatGPTLite.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/node": "^22.13.4",
+    "electron": "^34.0.2",
+    "electron-builder": "^25.1.8",
+    "svelte": "^5.17.3",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0",
+    "vite-plugin-electron": "^0.29.0",
+    "vitest": "^3.0.5"
+  }
+}

@@ -1,0 +1,9 @@
+AGENTS.md
+node_modules
+dist
+dist-electron
+release
+.vite
+.DS_Store
+coverage
+*.log
